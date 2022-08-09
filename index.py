@@ -1,6 +1,8 @@
 import asyncio
 import websockets
 import json
+import time
+import sys
 
 rxGroup = set()
 fullRxGroup = set()
@@ -14,6 +16,20 @@ def error_json(message):
 
 def info_json(message):
     return json.dumps({"type": "info", "data": message})
+
+
+writeQueue = asyncio.Queue()
+writeQueueEnabled = False
+
+
+async def write_worker():
+    with open("log.jsonl", "a+") as logFile:
+        while True:
+            message = await writeQueue.get()
+            message["time"] = time.time()
+            logFile.write(json.dumps(message) + "\n")
+            print("logged: " + json.dumps(message))
+            writeQueue.task_done()
 
 
 async def respond(websocket, path):
@@ -54,6 +70,7 @@ async def respond(websocket, path):
                             json.dumps({"type": "pop", "data": len(txGroupIds)})
                         )
                     log = {"type": "txinit", **metadata}
+                    writeQueue.put_nowait(log)
                     for ws in fullRxGroup:
                         await ws.send(json.dumps({"type": "log", "data": log}))
                     await websocket.send(info_json("txinit success"))
@@ -68,6 +85,7 @@ async def respond(websocket, path):
                             "id": myId,
                             "path": request["data"],
                         }
+                        writeQueue.put_nowait(log)
                         for ws in fullRxGroup:
                             await ws.send(json.dumps({"type": "log", "data": log}))
                         await websocket.send(info_json("pathUpdate success"))
@@ -89,14 +107,17 @@ async def respond(websocket, path):
             del txGroupMetadata[myId]
             for ws in rxGroup:
                 await ws.send(json.dumps({"type": "pop", "data": len(txGroupIds)}))
+            log = {"type": "disconnect", "id": myId}
+            writeQueue.put_nowait(log)
             for ws in fullRxGroup:
-                log = {"type": "disconnect", "id": myId}
                 await ws.send(json.dumps({"type": "log", "data": log}))
         if fullRx:
             fullRxGroup.remove(websocket)
 
 
 async def main():
+    asyncio.create_task(write_worker())
+    writeQueue.put_nowait({"type": "start"})
     async with websockets.serve(respond, "localhost", 6002):
         await asyncio.Future()  # run forever
 
