@@ -25,6 +25,7 @@ async def respond(websocket, path):
         rx = False
     if path == "/full":
         fullRx = True
+        fullRxGroup.add(websocket)
         await websocket.send(json.dumps({"type": "metadata", "data": txGroupMetadata}))
     if rx:
         rxGroup.add(websocket)
@@ -49,10 +50,9 @@ async def respond(websocket, path):
                     txGroupIds.add(myId)
                     txGroupMetadata[myId] = metadata
                     for ws in rxGroup:
-                        for ws in rxGroup:
-                            await ws.send(
-                                json.dumps({"type": "pop", "data": len(txGroupIds)})
-                            )
+                        await ws.send(
+                            json.dumps({"type": "pop", "data": len(txGroupIds)})
+                        )
                     log = {"type": "txinit", **metadata}
                     for ws in fullRxGroup:
                         await ws.send(json.dumps({"type": "log", "data": log}))
