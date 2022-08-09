@@ -22,8 +22,8 @@ writeQueue = asyncio.Queue()
 writeQueueEnabled = False
 
 
-async def write_worker():
-    with open("log.jsonl", "a+") as logFile:
+async def write_worker(filename):
+    with open(filename, "a+") as logFile:
         while True:
             message = await writeQueue.get()
             message["time"] = time.time()
@@ -116,7 +116,10 @@ async def respond(websocket, path):
 
 
 async def main():
-    asyncio.create_task(write_worker())
+    filename = "log.jsonl"
+    if len(sys.argv) > 1:
+        filename = sys.argv[1]
+    asyncio.create_task(write_worker(filename))
     writeQueue.put_nowait({"type": "start"})
     async with websockets.serve(respond, "0.0.0.0", 6002):
         await asyncio.Future()  # run forever
