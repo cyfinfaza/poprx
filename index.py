@@ -118,7 +118,7 @@ async def respond(websocket, path):
 async def main():
     asyncio.create_task(write_worker())
     writeQueue.put_nowait({"type": "start"})
-    async with websockets.serve(respond, "localhost", 6002):
+    async with websockets.serve(respond, "0.0.0.0", 6002):
         await asyncio.Future()  # run forever
 
 
