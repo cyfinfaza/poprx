@@ -57,25 +57,28 @@ async def respond(websocket, path):
                     "agent": request["data"]["agent"],
                     "path": request["data"]["path"],
                 }
-                if (
-                    not metadata["id"] in txGroupIds
-                    and myId == ""
-                    and len(json.dumps(metadata)) < 1024
-                ):
-                    myId = metadata["id"]
-                    txGroupIds.add(myId)
-                    txGroupMetadata[myId] = metadata
-                    for ws in rxGroup:
-                        await ws.send(
-                            json.dumps({"type": "pop", "data": len(txGroupIds)})
-                        )
-                    log = {"type": "txinit", **metadata}
-                    writeQueue.put_nowait(log)
-                    for ws in fullRxGroup:
-                        await ws.send(json.dumps({"type": "log", "data": log}))
-                    await websocket.send(info_json("txinit success"))
-                else:
-                    await websocket.send(error_json("txinit failed"))
+                if metadata["id"] in txGroupIds:
+                    await websocket.send(error_json("txinit failed because another client is already using this ID"))
+                    continue
+                if len(json.dumps(metadata)) > 1024:
+                    await websocket.send(error_json("txinit failed because metadata is too long"))
+                    continue
+                if not myId == "":
+                    await websocket.send(error_json("txinit failed because the client already has an ID on the server"))
+                    continue
+                myId = metadata["id"]
+                txGroupIds.add(myId)
+                txGroupMetadata[myId] = metadata
+                for ws in rxGroup:
+                    await ws.send(
+                        json.dumps(
+                            {"type": "pop", "data": len(txGroupIds)})
+                    )
+                log = {"type": "txinit", **metadata}
+                writeQueue.put_nowait(log)
+                for ws in fullRxGroup:
+                    await ws.send(json.dumps({"type": "log", "data": log}))
+                await websocket.send(info_json("txinit success"))
             elif request["type"] == "pathUpdate":
                 if myId != "":
                     if request["data"] != txGroupMetadata[myId]["path"]:
@@ -91,7 +94,8 @@ async def respond(websocket, path):
                         await websocket.send(info_json("pathUpdate success"))
                     else:
                         await websocket.send(
-                            error_json("pathUpdate failed: attempted to set same path")
+                            error_json(
+                                "pathUpdate failed: attempted to set same path")
                         )
                 else:
                     await websocket.send(error_json("user not initialized"))
