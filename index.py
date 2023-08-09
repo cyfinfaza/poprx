@@ -23,10 +23,10 @@ writeQueueEnabled = False
 
 
 async def write_worker(filename):
-    with open(filename, "a+") as logFile:
-        while True:
-            message = await writeQueue.get()
-            message["time"] = time.time()
+    while True:
+        message = await writeQueue.get()
+        message["time"] = time.time()
+        with open(filename, "a+") as logFile:
             logFile.write(json.dumps(message) + "\n")
             print("logged: " + json.dumps(message))
             writeQueue.task_done()
