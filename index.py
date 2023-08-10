@@ -81,22 +81,17 @@ async def respond(websocket, path):
                 await websocket.send(info_json("txinit success"))
             elif request["type"] == "pathUpdate":
                 if myId != "":
+                    txGroupMetadata[myId]["path"] = request["data"]
+                    log = {
+                        "type": "pathUpdate",
+                        "id": myId,
+                        "path": request["data"],
+                    }
                     if request["data"] != txGroupMetadata[myId]["path"]:
-                        txGroupMetadata[myId]["path"] = request["data"]
-                        log = {
-                            "type": "pathupdate",
-                            "id": myId,
-                            "path": request["data"],
-                        }
                         writeQueue.put_nowait(log)
-                        for ws in fullRxGroup:
-                            await ws.send(json.dumps({"type": "log", "data": log}))
-                        await websocket.send(info_json("pathUpdate success"))
-                    else:
-                        await websocket.send(
-                            error_json(
-                                "pathUpdate failed: attempted to set same path")
-                        )
+                    for ws in fullRxGroup:
+                        await ws.send(json.dumps({"type": "log", "data": log}))
+                    await websocket.send(info_json("pathUpdate success"))
                 else:
                     await websocket.send(error_json("user not initialized"))
             # except Exception as e:
